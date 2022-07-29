@@ -1,10 +1,10 @@
 use crate::client_transaction_handler::ClientTransactionHandler;
-use crate::transaction::Transaction;
+use crate::transaction::{Transaction, TxType};
 use crate::Client;
 use std::collections::HashMap;
 
 /// The AppState is a placeholder for the application or database state.
-/// It implements the ClientTransactionHandler Trait which acts like an api to the
+/// It implements the ClientTransactionHandler Trait which is an api to the
 /// core logic of the program.
 pub struct AppState {
     transactions: HashMap<u32, Transaction>,
@@ -37,6 +37,21 @@ impl AppState {
         }
 
         /// TODO: Parse and handle transaction type.
+        ///
+        let client = self
+            .clients
+            .get_mut(&t.client_id())
+            .expect("Client not found");
+        if let Ok(tx_type) = t.tx_type() {
+            match tx_type {
+                TxType::Deposit => {
+                    let amount = t.amount().unwrap();
+                    client.deposit(amount.into())?;
+                }
+
+                _ => (),
+            }
+        }
         Ok(())
     }
 
@@ -67,3 +82,5 @@ impl ClientTransactionHandler for AppState {
         self.clients.clone()
     }
 }
+
+//TODO: Add Tests for AppState logic

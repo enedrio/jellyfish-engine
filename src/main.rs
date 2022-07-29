@@ -39,6 +39,7 @@ fn main() -> Result<(), csv::Error> {
     let file_path = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "data.csv".to_string());
+    // TODO: Replace this unwrap_or_else with a sensible error message.
     let csv_data = read_csv_from_file(&file_path)?;
     parse_transactions(csv_data)?;
     Ok(())
