@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 // By default, struct field names are deserialized based on the position of
 // a corresponding field in the CSV data's header record.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Transaction {
     #[serde(rename = "type")]
     tx_type: String,

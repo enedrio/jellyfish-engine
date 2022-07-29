@@ -1,5 +1,6 @@
 use std::fmt;
 
+#[derive(Debug, Clone)]
 pub struct Client {
     id: u32,
     available: f64, // hm, dangerous type, because of rounding errors, or not?
@@ -30,6 +31,39 @@ impl Client {
             self.total(),
             self.locked,
         )
+    }
+
+    pub fn as_csv(&self) -> String {
+        format!(
+            "{},{},{},{},{}",
+            self.id,
+            self.available,
+            self.held,
+            self.total(),
+            self.locked,
+        )
+    }
+
+    fn is_locked(&self) -> Result<(), &'static str> {
+        if self.locked {
+            Err("Client is locked")
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Adds `amount` to the clients available funds and returns the new available amount.
+    pub fn deposit(&mut self, amount: f64) -> Result<f64, &'static str> {
+        self.is_locked()?;
+        self.available += amount;
+        Ok(self.available)
+    }
+
+    /// Withdraws `amount` from the clients available funds and returns the new available amount.
+    pub fn withdraw(&mut self, amount: f64) -> Result<f64, &'static str> {
+        self.is_locked()?;
+        self.available -= amount;
+        Ok(self.available)
     }
 
     pub fn lock(&mut self) -> Result<(), String> {
