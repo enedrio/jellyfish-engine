@@ -1,14 +1,14 @@
 use std::io::Read;
 
-mod app_state;
 mod client;
 mod client_transaction_handler;
 mod transaction;
 
-use crate::client_transaction_handler::ClientTransactionHandler;
-use app_state::AppState;
 use client::Client;
+use client_transaction_handler::ClientTransactionHandler;
 use transaction::Transaction;
+
+use csv::{ReaderBuilder, Trim};
 
 fn read_csv_from_file(file_path: &str) -> Result<String, std::io::Error> {
     let mut file = std::fs::File::open(file_path)?;
@@ -18,18 +18,20 @@ fn read_csv_from_file(file_path: &str) -> Result<String, std::io::Error> {
 }
 
 fn parse_transactions(csv_data: String) -> Result<(), csv::Error> {
-    let mut reader = csv::Reader::from_reader(csv_data.as_bytes());
+    let mut reader = ReaderBuilder::new()
+        .trim(Trim::All)
+        .from_reader(csv_data.as_bytes());
 
-    let mut app_state = AppState::new();
+    let mut handler = ClientTransactionHandler::new();
     for transaction in reader.deserialize() {
-        app_state
+        handler
             .add_transaction(transaction?)
             .expect("Something went wrong while adding the transaction");
     }
 
     // quick hack for client csv output
     println!("client,available,held,total,locked");
-    for client in app_state.clients().values() {
+    for client in handler.clients().values() {
         println!("{}", client.as_csv());
     }
     Ok(())

@@ -2,14 +2,14 @@ use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct Client {
-    id: u32,
+    id: u16,
     available: f64, // hm, dangerous type, because of rounding errors, or not?
     held: f64,
     locked: bool,
 }
 
 impl Client {
-    pub fn from_id(id: u32) -> Self {
+    pub fn from_id(id: u16) -> Self {
         Self {
             id,
             available: 0.0,
@@ -18,12 +18,19 @@ impl Client {
         }
     }
 
-    // Maybe this is needed elsewhere someday, then we can make it public.
-    fn total(&self) -> f64 {
+    pub fn total(&self) -> f64 {
         self.available + self.held
     }
 
-    pub fn as_tuple(&self) -> (u32, f64, f64, f64, bool) {
+    pub fn available(&self) -> f64 {
+        self.available
+    }
+
+    pub fn held(&self) -> f64 {
+        self.held
+    }
+
+    pub fn as_tuple(&self) -> (u16, f64, f64, f64, bool) {
         (
             self.id,
             self.available,
@@ -35,7 +42,7 @@ impl Client {
 
     pub fn as_csv(&self) -> String {
         format!(
-            "{},{},{},{},{}",
+            "{},{:.4},{:.4},{:.4},{}",
             self.id,
             self.available,
             self.held,
@@ -62,8 +69,12 @@ impl Client {
     /// Withdraws `amount` from the clients available funds and returns the new available amount.
     pub fn withdraw(&mut self, amount: f64) -> Result<f64, &'static str> {
         self.is_locked()?;
-        self.available -= amount;
-        Ok(self.available)
+        if amount > self.available {
+            Err("Amount is not available")
+        } else {
+            self.available -= amount;
+            Ok(self.available)
+        }
     }
 
     pub fn lock(&mut self) -> Result<(), String> {
@@ -83,13 +94,43 @@ impl Client {
             Ok(())
         }
     }
+
+    pub fn dispute(&mut self, amount: f64) -> Result<(), String> {
+        if amount > self.available {
+            Err("Amount not available. Can't be held".to_string())
+        } else {
+            self.available -= amount;
+            self.held += amount;
+            Ok(())
+        }
+    }
+
+    pub fn resolve(&mut self, amount: f64) -> Result<(), String> {
+        if amount > self.held {
+            Err("Amount not available. Can't be resolved".to_string())
+        } else {
+            self.available += amount;
+            self.held -= amount;
+            Ok(())
+        }
+    }
+
+    pub fn chargeback(&mut self, amount: f64) -> Result<(), String> {
+        if amount > self.held {
+            Err("Amount not available. Can't be charged back".to_string())
+        } else {
+            self.held -= amount;
+            self.lock()?;
+            Ok(())
+        }
+    }
 }
 
 impl fmt::Display for Client {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "Client {}: available: {}, held: {}, total: {}, locked: {}",
+            "Client {}: available: {:.4}, held: {:.4}, total: {:.4}, locked: {}",
             self.id,
             self.available,
             self.held,

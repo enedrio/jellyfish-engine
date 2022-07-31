@@ -1,13 +1,23 @@
-use std::{fmt, str::FromStr};
+use std::{
+    fmt::{self, Display},
+    str::FromStr,
+};
 
 use serde::Deserialize;
 
+#[derive(Debug)]
 pub enum TxType {
     Deposit,
     Withdrawal,
     Dispute,
     Resolve,
     Chargeback,
+}
+
+impl Display for TxType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
 }
 
 impl std::str::FromStr for TxType {
@@ -27,26 +37,39 @@ impl std::str::FromStr for TxType {
 
 // By default, struct field names are deserialized based on the position of
 // a corresponding field in the CSV data's header record.
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct Transaction {
     #[serde(rename = "type")]
     tx_type: String,
     #[serde(rename = "client")]
-    client_id: u32,
+    client_id: u16,
     #[serde(rename = "tx")]
     tx_id: u32,
     amount: Option<f32>,
     #[serde(skip)]
     disputed: bool,
+    #[serde(skip)]
+    charged_back: bool,
 }
 
 impl Transaction {
+    pub fn new(tx_type: String, client_id: u16, tx_id: u32, amount: Option<f32>) -> Self {
+        Self {
+            tx_type,
+            client_id,
+            tx_id,
+            amount,
+            disputed: false,
+            charged_back: false,
+        }
+    }
+
     pub fn id(&self) -> u32 {
         self.tx_id
     }
 
     // getset crate could be used here instead
-    pub fn client_id(&self) -> u32 {
+    pub fn client_id(&self) -> u16 {
         self.client_id
     }
 
@@ -67,6 +90,34 @@ impl Transaction {
             self.disputed = true;
             Ok(())
         }
+    }
+
+    // if the transaction is already under dispute,
+    // this function returns an error.
+    pub fn resolve(&mut self) -> Result<(), String> {
+        if !self.disputed {
+            Err("Transaction is not under dispute".to_string())
+        } else {
+            self.disputed = false;
+            Ok(())
+        }
+    }
+
+    pub fn chargeback(&mut self) -> Result<(), String> {
+        if self.charged_back {
+            Err("Transaction already marked as charged back".to_string())
+        } else {
+            self.charged_back = true;
+            Ok(())
+        }
+    }
+
+    pub fn charged_back(&self) -> bool {
+        self.charged_back
+    }
+
+    pub fn disputed(&self) -> bool {
+        self.disputed
     }
 }
 
