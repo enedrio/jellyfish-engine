@@ -20,37 +20,37 @@ impl ClientTransactionHandler {
 
     /// Adds a transaction to the internal transaction map.
     fn log_transaction(&mut self, t: Transaction) -> Result<(), TransactionError> {
-        if self.transactions.contains_key(&t.id()) {
-            Err(TransactionError::TransactionExistsAlready)
-        } else {
-            self.transactions.insert(t.id(), t);
+        if let std::collections::hash_map::Entry::Vacant(e) = self.transactions.entry(t.id()) {
+            e.insert(t);
             Ok(())
+        } else {
+            Err(TransactionError::TransactionExistsAlready)
         }
     }
 
     /// Parses the transaction type and reacts appropriately.
     pub fn add_transaction(&mut self, t: Transaction) -> Result<(), TransactionError> {
         // Create client if it does not exist yet
-        if !self.clients.contains_key(&t.client_id()) {
-            self.clients
-                .insert(t.client_id(), Client::from_id(t.client_id()));
-        }
+
+        self.clients
+            .entry(t.client_id())
+            .or_insert_with(|| Client::from_id(t.client_id()));
 
         let client = self
             .clients
             .get_mut(&t.client_id())
-            .ok_or_else(|| TransactionError::ClientDoesNotExist)?;
+            .ok_or(TransactionError::ClientDoesNotExist)?;
 
         match t.tx_type()? {
             TxType::Deposit => {
                 let amount = t.amount().unwrap();
-                client.deposit(amount.into())?;
+                client.deposit(amount)?;
                 self.log_transaction(t)?;
                 Ok(())
             }
             TxType::Withdrawal => {
                 let amount = t.amount().unwrap();
-                client.withdraw(amount.into())?;
+                client.withdraw(amount)?;
                 self.log_transaction(t)?;
                 Ok(())
             }
@@ -73,18 +73,18 @@ impl ClientTransactionHandler {
         let tx = self
             .transactions
             .get_mut(&id)
-            .ok_or_else(|| TransactionError::InvalidDispute)?;
+            .ok_or(TransactionError::InvalidDispute)?;
 
         let client = self
             .clients
             .get_mut(&tx.client_id())
-            .ok_or_else(|| TransactionError::InvalidDispute)?;
+            .ok_or(TransactionError::InvalidDispute)?;
 
         tx.dispute()?;
 
         client.dispute(
             tx.amount()
-                .ok_or_else(|| TransactionError::InvalidTransactionRecord)? as f64,
+                .ok_or(TransactionError::InvalidTransactionRecord)? as f64,
         )?;
         Ok(())
     }
@@ -93,17 +93,17 @@ impl ClientTransactionHandler {
         let tx = self
             .transactions
             .get_mut(&id)
-            .ok_or_else(|| TransactionError::InvalidResolve)?;
+            .ok_or(TransactionError::InvalidResolve)?;
 
         let client = self
             .clients
             .get_mut(&tx.client_id())
-            .ok_or_else(|| TransactionError::InvalidResolve)?;
+            .ok_or(TransactionError::InvalidResolve)?;
         tx.resolve()?;
 
         client.resolve(
             tx.amount()
-                .ok_or_else(|| TransactionError::InvalidTransactionRecord)? as f64,
+                .ok_or(TransactionError::InvalidTransactionRecord)? as f64,
         )?;
         Ok(())
     }
@@ -112,18 +112,18 @@ impl ClientTransactionHandler {
         let tx = self
             .transactions
             .get_mut(&id)
-            .ok_or_else(|| TransactionError::InvalidResolve)?;
+            .ok_or(TransactionError::InvalidResolve)?;
 
         let client = self
             .clients
             .get_mut(&tx.client_id())
-            .ok_or_else(|| TransactionError::InvalidResolve)?;
+            .ok_or(TransactionError::InvalidResolve)?;
         tx.resolve()?;
         tx.chargeback()?;
 
         client.chargeback(
             tx.amount()
-                .ok_or_else(|| TransactionError::InvalidTransactionRecord)? as f64,
+                .ok_or(TransactionError::InvalidTransactionRecord)? as f64,
         )?;
         Ok(())
     }
@@ -134,7 +134,8 @@ impl ClientTransactionHandler {
     }
 }
 
-mod test {
+#[cfg(test)]
+mod tests {
     use super::ClientTransactionHandler;
     use crate::transaction::{Transaction, TxType};
 

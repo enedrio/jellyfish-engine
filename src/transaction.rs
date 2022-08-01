@@ -45,7 +45,7 @@ pub struct Transaction {
     client_id: u16,
     #[serde(rename = "tx")]
     tx_id: u32,
-    amount: Option<f32>,
+    amount: Option<f64>,
     #[serde(skip)]
     disputed: bool,
     #[serde(skip)]
@@ -53,7 +53,8 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn new(tx_type: String, client_id: u16, tx_id: u32, amount: Option<f32>) -> Self {
+    #[allow(dead_code)]
+    pub fn new(tx_type: String, client_id: u16, tx_id: u32, amount: Option<f64>) -> Self {
         Self {
             tx_type,
             client_id,
@@ -77,7 +78,7 @@ impl Transaction {
         TxType::from_str(&self.tx_type)
     }
 
-    pub fn amount(&self) -> Option<f32> {
+    pub fn amount(&self) -> Option<f64> {
         self.amount
     }
 
@@ -112,10 +113,12 @@ impl Transaction {
         }
     }
 
+    #[allow(dead_code)]
     pub fn charged_back(&self) -> bool {
         self.charged_back
     }
 
+    #[allow(dead_code)]
     pub fn disputed(&self) -> bool {
         self.disputed
     }

@@ -4,6 +4,7 @@ use std::fmt;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Client {
+    #[serde(rename = "client")]
     id: u16,
     available: f64, // hm, dangerous type, because of rounding errors, or not?
     held: f64,
@@ -24,33 +25,14 @@ impl Client {
         self.available + self.held
     }
 
+    #[allow(dead_code)]
     pub fn available(&self) -> f64 {
         self.available
     }
 
+    #[allow(dead_code)]
     pub fn held(&self) -> f64 {
         self.held
-    }
-
-    pub fn as_tuple(&self) -> (u16, f64, f64, f64, bool) {
-        (
-            self.id,
-            self.available,
-            self.held,
-            self.total(),
-            self.locked,
-        )
-    }
-
-    pub fn as_csv(&self) -> String {
-        format!(
-            "{},{:.4},{:.4},{:.4},{}",
-            self.id,
-            self.available,
-            self.held,
-            self.total(),
-            self.locked,
-        )
     }
 
     fn is_locked(&self) -> Result<(), TransactionError> {

@@ -1,4 +1,4 @@
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 
 mod client;
 mod client_transaction_handler;
@@ -10,21 +10,11 @@ use client_transaction_handler::ClientTransactionHandler;
 
 use csv::{ReaderBuilder, Trim};
 
-fn read_csv_from_file(file_path: &str) -> Result<String, std::io::Error> {
-    let mut file = std::fs::File::open(file_path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents)
-}
-
-fn parse_transactions(
-    csv_data: String,
-    handler: &mut ClientTransactionHandler,
-) -> Result<(), csv::Error> {
-    let mut reader = ReaderBuilder::new()
-        .trim(Trim::All)
-        .from_reader(csv_data.as_bytes());
-
+fn parse_transactions<T>(input: T, handler: &mut ClientTransactionHandler) -> Result<(), csv::Error>
+where
+    T: std::io::Read,
+{
+    let mut reader = ReaderBuilder::new().trim(Trim::All).from_reader(input);
     for transaction in reader.deserialize() {
         let result = handler.add_transaction(transaction?);
         if let Err(err) = result {
@@ -53,8 +43,29 @@ fn main() -> Result<(), csv::Error> {
         .nth(1)
         .unwrap_or_else(|| "data.csv".to_string());
     let mut handler = ClientTransactionHandler::new();
-    let csv_data = read_csv_from_file(&file_path)?;
-    parse_transactions(csv_data, &mut handler)?;
+    let file = std::fs::File::open(file_path)?;
+    parse_transactions(file, &mut handler)?;
     output_clients_to_stdout(&handler)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_transactions;
+    use crate::client_transaction_handler::ClientTransactionHandler;
+    #[test]
+    fn it_can_handle_white_space_in_csv() {
+        let data = "type, client, tx,amount\ndeposit, 1, 1, 1.0\n";
+        let mut handler = ClientTransactionHandler::new();
+        parse_transactions(data.as_bytes(), &mut handler).unwrap();
+        assert_eq!(handler.clients().get(&1).unwrap().total(), 1.0);
+    }
+
+    #[test]
+    fn it_() {
+        let data = "type, client, tx,amount\ndeposit, 1, 1, 1.0\n";
+        let mut handler = ClientTransactionHandler::new();
+        parse_transactions(data.as_bytes(), &mut handler).unwrap();
+        assert_eq!(handler.clients().get(&1).unwrap().total(), 1.0);
+    }
 }
