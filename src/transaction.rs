@@ -5,7 +5,7 @@ use std::{
     str::FromStr,
 };
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TxType {
     Deposit,
     Withdrawal,
@@ -85,7 +85,7 @@ impl Transaction {
     // if the transaction is already under dispute,
     // this function returns an error.
     pub fn dispute(&mut self) -> Result<(), TransactionError> {
-        if self.disputed {
+        if self.disputed || self.tx_type()? != TxType::Deposit {
             Err(TransactionError::InvalidDispute)
         } else {
             self.disputed = true;
@@ -96,7 +96,7 @@ impl Transaction {
     // if the transaction is already under dispute,
     // this function returns an error.
     pub fn resolve(&mut self) -> Result<(), TransactionError> {
-        if !self.disputed {
+        if !self.disputed || self.tx_type()? != TxType::Deposit {
             Err(TransactionError::InvalidResolve)
         } else {
             self.disputed = false;
@@ -105,7 +105,7 @@ impl Transaction {
     }
 
     pub fn chargeback(&mut self) -> Result<(), TransactionError> {
-        if self.charged_back {
+        if self.charged_back || self.tx_type()? != TxType::Deposit {
             Err(TransactionError::InvalidChargeback)
         } else {
             self.charged_back = true;

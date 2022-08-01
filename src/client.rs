@@ -6,7 +6,7 @@ use std::fmt;
 pub struct Client {
     #[serde(rename = "client")]
     id: u16,
-    available: f64, // hm, dangerous type, because of rounding errors, or not?
+    available: f64,
     held: f64,
     locked: bool,
 }
