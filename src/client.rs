@@ -8,6 +8,7 @@ pub struct Client {
     id: u16,
     available: f64,
     held: f64,
+    total: f64,
     locked: bool,
 }
 
@@ -17,12 +18,17 @@ impl Client {
             id,
             available: 0.0,
             held: 0.0,
+            total: 0.0,
             locked: false,
         }
     }
 
     pub fn total(&self) -> f64 {
         self.available + self.held
+    }
+
+    fn update_total(&mut self) {
+        self.total = self.total();
     }
 
     #[allow(dead_code)]
@@ -47,6 +53,7 @@ impl Client {
     pub fn deposit(&mut self, amount: f64) -> Result<f64, TransactionError> {
         self.is_locked()?;
         self.available += amount;
+        self.update_total();
         Ok(self.available)
     }
 
@@ -60,6 +67,7 @@ impl Client {
             })
         } else {
             self.available -= amount;
+            self.update_total();
             Ok(self.available)
         }
     }
@@ -117,6 +125,7 @@ impl Client {
             })
         } else {
             self.held -= amount;
+            self.update_total();
             self.lock()?;
             Ok(())
         }
