@@ -1,9 +1,9 @@
+use crate::errors::TransactionError;
+use serde::Deserialize;
 use std::{
     fmt::{self, Display},
     str::FromStr,
 };
-
-use serde::Deserialize;
 
 #[derive(Debug)]
 pub enum TxType {
@@ -21,7 +21,7 @@ impl Display for TxType {
 }
 
 impl std::str::FromStr for TxType {
-    type Err = String;
+    type Err = TransactionError;
 
     fn from_str(input: &str) -> Result<TxType, Self::Err> {
         match input {
@@ -30,7 +30,7 @@ impl std::str::FromStr for TxType {
             "dispute" => Ok(TxType::Dispute),
             "resolve" => Ok(TxType::Resolve),
             "chargeback" => Ok(TxType::Chargeback),
-            _ => Err("Unknown Transaction Type".to_string()),
+            _ => Err(TransactionError::UnknownTransactionType),
         }
     }
 }
@@ -73,7 +73,7 @@ impl Transaction {
         self.client_id
     }
 
-    pub fn tx_type(&self) -> Result<TxType, String> {
+    pub fn tx_type(&self) -> Result<TxType, TransactionError> {
         TxType::from_str(&self.tx_type)
     }
 
@@ -83,9 +83,9 @@ impl Transaction {
 
     // if the transaction is already under dispute,
     // this function returns an error.
-    pub fn dispute(&mut self) -> Result<(), String> {
+    pub fn dispute(&mut self) -> Result<(), TransactionError> {
         if self.disputed {
-            Err("Already disputed".to_string())
+            Err(TransactionError::InvalidDispute)
         } else {
             self.disputed = true;
             Ok(())
@@ -94,18 +94,18 @@ impl Transaction {
 
     // if the transaction is already under dispute,
     // this function returns an error.
-    pub fn resolve(&mut self) -> Result<(), String> {
+    pub fn resolve(&mut self) -> Result<(), TransactionError> {
         if !self.disputed {
-            Err("Transaction is not under dispute".to_string())
+            Err(TransactionError::InvalidResolve)
         } else {
             self.disputed = false;
             Ok(())
         }
     }
 
-    pub fn chargeback(&mut self) -> Result<(), String> {
+    pub fn chargeback(&mut self) -> Result<(), TransactionError> {
         if self.charged_back {
-            Err("Transaction already marked as charged back".to_string())
+            Err(TransactionError::InvalidChargeback)
         } else {
             self.charged_back = true;
             Ok(())

@@ -7,4 +7,7 @@ edition = "2021"
 
 [dependencies]
 csv = "1.1.6"
+env_logger = "0.9.0"
+log = "0.4.17"
 serde = { version = "1.0.140", features = ["derive"] }
+thiserror = "1.0.31"

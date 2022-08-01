@@ -1,3 +1,4 @@
+use crate::errors::TransactionError;
 use crate::transaction::{Transaction, TxType};
 use crate::Client;
 use std::collections::HashMap;
@@ -18,17 +19,18 @@ impl ClientTransactionHandler {
     }
 
     /// Adds a transaction to the internal transaction map.
-    fn log_transaction(&mut self, t: Transaction) -> Result<(), String> {
+    fn log_transaction(&mut self, t: Transaction) -> Result<(), TransactionError> {
         if self.transactions.contains_key(&t.id()) {
-            Err("Transaction exists already".to_string())
+            Err(TransactionError::TransactionExistsAlready)
         } else {
             self.transactions.insert(t.id(), t);
             Ok(())
         }
     }
 
-    /// Parses the transaction type and reacts appropriatly.
-    pub fn add_transaction(&mut self, t: Transaction) -> Result<(), String> {
+    /// Parses the transaction type and reacts appropriately.
+    pub fn add_transaction(&mut self, t: Transaction) -> Result<(), TransactionError> {
+        // Create client if it does not exist yet
         if !self.clients.contains_key(&t.client_id()) {
             self.clients
                 .insert(t.client_id(), Client::from_id(t.client_id()));
@@ -37,104 +39,100 @@ impl ClientTransactionHandler {
         let client = self
             .clients
             .get_mut(&t.client_id())
-            .expect("Client not found");
-        if let Ok(tx_type) = t.tx_type() {
-            match tx_type {
-                TxType::Deposit => {
-                    let amount = t.amount().unwrap();
-                    client.deposit(amount.into())?;
-                    self.log_transaction(t)?;
-                    Ok(())
-                }
-                TxType::Withdrawal => {
-                    let amount = t.amount().unwrap();
-                    client.withdraw(amount.into())?;
-                    self.log_transaction(t)?;
-                    Ok(())
-                }
-                TxType::Dispute => {
-                    self.dispute_transaction(t.id())?;
-                    Ok(())
-                }
-                TxType::Resolve => {
-                    self.resolve_transaction(t.id())?;
-                    Ok(())
-                }
-                TxType::Chargeback => {
-                    self.chargeback_transaction(t.id())?;
-                    Ok(())
-                }
+            .ok_or_else(|| TransactionError::ClientDoesNotExist)?;
 
-                _ => Err("Unknown Transaction Type".to_string()),
-            }
-        } else {
-            Ok(())
-        }
-    }
-
-    fn dispute_transaction(&mut self, id: u32) -> Result<(), String> {
-        if let Some(t) = self.transactions.get_mut(&id) {
-            t.dispute()?;
-            if let Some(c) = self.clients.get_mut(&t.client_id()) {
-                c.dispute(
-                    t.amount()
-                        .expect("All Transactions that are logged have to have an amount")
-                        as f64,
-                )?;
+        match t.tx_type()? {
+            TxType::Deposit => {
+                let amount = t.amount().unwrap();
+                client.deposit(amount.into())?;
+                self.log_transaction(t)?;
                 Ok(())
-            } else {
-                Err("Client does not exist".to_string())
             }
-        } else {
-            Err("Transaction does not exist".to_string())
-        }
-    }
-
-    fn resolve_transaction(&mut self, id: u32) -> Result<(), String> {
-        if let Some(t) = self.transactions.get_mut(&id) {
-            t.resolve()?;
-            if let Some(c) = self.clients.get_mut(&t.client_id()) {
-                // TODO: dispute amount of transaction in client
-                c.resolve(
-                    t.amount()
-                        .expect("All Transactions that are logged have to have an amount")
-                        as f64,
-                )?;
+            TxType::Withdrawal => {
+                let amount = t.amount().unwrap();
+                client.withdraw(amount.into())?;
+                self.log_transaction(t)?;
                 Ok(())
-            } else {
-                Err("Client does not exist".to_string())
             }
-        } else {
-            Err("Transaction does not exist".to_string())
-        }
-    }
-
-    fn chargeback_transaction(&mut self, id: u32) -> Result<(), String> {
-        if let Some(t) = self.transactions.get_mut(&id) {
-            t.resolve()?;
-            t.chargeback()?;
-            if let Some(c) = self.clients.get_mut(&t.client_id()) {
-                c.chargeback(
-                    t.amount()
-                        .expect("All Transactions that are logged have to have an amount")
-                        as f64,
-                )?;
+            TxType::Dispute => {
+                self.dispute_transaction(t.id())?;
                 Ok(())
-            } else {
-                Err("Client does not exist".to_string())
             }
-        } else {
-            Err("Transaction does not exist".to_string())
+            TxType::Resolve => {
+                self.resolve_transaction(t.id())?;
+                Ok(())
+            }
+            TxType::Chargeback => {
+                self.chargeback_transaction(t.id())?;
+                Ok(())
+            }
         }
     }
 
-    pub fn clients(&self) -> HashMap<u16, Client> {
+    fn dispute_transaction(&mut self, id: u32) -> Result<(), TransactionError> {
+        let tx = self
+            .transactions
+            .get_mut(&id)
+            .ok_or_else(|| TransactionError::InvalidDispute)?;
+
+        let client = self
+            .clients
+            .get_mut(&tx.client_id())
+            .ok_or_else(|| TransactionError::InvalidDispute)?;
+
+        tx.dispute()?;
+
+        client.dispute(
+            tx.amount()
+                .ok_or_else(|| TransactionError::InvalidTransactionRecord)? as f64,
+        )?;
+        Ok(())
+    }
+
+    fn resolve_transaction(&mut self, id: u32) -> Result<(), TransactionError> {
+        let tx = self
+            .transactions
+            .get_mut(&id)
+            .ok_or_else(|| TransactionError::InvalidResolve)?;
+
+        let client = self
+            .clients
+            .get_mut(&tx.client_id())
+            .ok_or_else(|| TransactionError::InvalidResolve)?;
+        tx.resolve()?;
+
+        client.resolve(
+            tx.amount()
+                .ok_or_else(|| TransactionError::InvalidTransactionRecord)? as f64,
+        )?;
+        Ok(())
+    }
+
+    fn chargeback_transaction(&mut self, id: u32) -> Result<(), TransactionError> {
+        let tx = self
+            .transactions
+            .get_mut(&id)
+            .ok_or_else(|| TransactionError::InvalidResolve)?;
+
+        let client = self
+            .clients
+            .get_mut(&tx.client_id())
+            .ok_or_else(|| TransactionError::InvalidResolve)?;
+        tx.resolve()?;
+        tx.chargeback()?;
+
+        client.chargeback(
+            tx.amount()
+                .ok_or_else(|| TransactionError::InvalidTransactionRecord)? as f64,
+        )?;
+        Ok(())
+    }
+
+    pub fn clients(&self) -> &HashMap<u16, Client> {
         // TODO: maybe use iterator over clients as return value instead
-        self.clients.clone()
+        &self.clients
     }
 }
-
-//TODO: Add Tests for AppState logic
 
 mod test {
     use super::ClientTransactionHandler;

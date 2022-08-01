@@ -1,6 +1,8 @@
+use crate::errors::TransactionError;
+use serde::Serialize;
 use std::fmt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Client {
     id: u16,
     available: f64, // hm, dangerous type, because of rounding errors, or not?
@@ -51,53 +53,60 @@ impl Client {
         )
     }
 
-    fn is_locked(&self) -> Result<(), &'static str> {
+    fn is_locked(&self) -> Result<(), TransactionError> {
         if self.locked {
-            Err("Client is locked")
+            Err(TransactionError::ClientIsLocked(self.id))
         } else {
             Ok(())
         }
     }
 
     /// Adds `amount` to the clients available funds and returns the new available amount.
-    pub fn deposit(&mut self, amount: f64) -> Result<f64, &'static str> {
+    pub fn deposit(&mut self, amount: f64) -> Result<f64, TransactionError> {
         self.is_locked()?;
         self.available += amount;
         Ok(self.available)
     }
 
     /// Withdraws `amount` from the clients available funds and returns the new available amount.
-    pub fn withdraw(&mut self, amount: f64) -> Result<f64, &'static str> {
+    pub fn withdraw(&mut self, amount: f64) -> Result<f64, TransactionError> {
         self.is_locked()?;
         if amount > self.available {
-            Err("Amount is not available")
+            Err(TransactionError::AmountNotAvailable {
+                client_id: self.id,
+                amount,
+            })
         } else {
             self.available -= amount;
             Ok(self.available)
         }
     }
 
-    pub fn lock(&mut self) -> Result<(), String> {
+    pub fn lock(&mut self) -> Result<(), TransactionError> {
         if self.locked {
-            Err("Already Locked".to_string())
+            Err(TransactionError::ClientLockFailed(self.id))
         } else {
             self.locked = true;
             Ok(())
         }
     }
 
-    pub fn unlock(&mut self) -> Result<(), String> {
+    #[allow(dead_code)]
+    pub fn unlock(&mut self) -> Result<(), TransactionError> {
         if !self.locked {
-            Err("Already Unlocked".to_string())
+            Err(TransactionError::ClientUnlockFailed(self.id))
         } else {
             self.locked = false;
             Ok(())
         }
     }
 
-    pub fn dispute(&mut self, amount: f64) -> Result<(), String> {
+    pub fn dispute(&mut self, amount: f64) -> Result<(), TransactionError> {
         if amount > self.available {
-            Err("Amount not available. Can't be held".to_string())
+            Err(TransactionError::AmountNotAvailable {
+                client_id: self.id,
+                amount,
+            })
         } else {
             self.available -= amount;
             self.held += amount;
@@ -105,9 +114,12 @@ impl Client {
         }
     }
 
-    pub fn resolve(&mut self, amount: f64) -> Result<(), String> {
+    pub fn resolve(&mut self, amount: f64) -> Result<(), TransactionError> {
         if amount > self.held {
-            Err("Amount not available. Can't be resolved".to_string())
+            Err(TransactionError::AmountNotHeld {
+                client_id: self.id,
+                amount,
+            })
         } else {
             self.available += amount;
             self.held -= amount;
@@ -115,9 +127,12 @@ impl Client {
         }
     }
 
-    pub fn chargeback(&mut self, amount: f64) -> Result<(), String> {
+    pub fn chargeback(&mut self, amount: f64) -> Result<(), TransactionError> {
         if amount > self.held {
-            Err("Amount not available. Can't be charged back".to_string())
+            Err(TransactionError::AmountNotHeld {
+                client_id: self.id,
+                amount,
+            })
         } else {
             self.held -= amount;
             self.lock()?;
